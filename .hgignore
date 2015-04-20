@@ -1,0 +1,17 @@
+syntax: glob
+
+.tmp*
+*.bak
+*.pyc
+*.DS_Store
+CA*.ofx
+compte_*
+.project
+.pydevproject
+.settings/
+.git/*
+test/output/*ofx
+test/output/*xml
+test/output/*csv
+
+
