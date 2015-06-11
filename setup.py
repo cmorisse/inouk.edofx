@@ -8,17 +8,17 @@ long_description = (
     '\nDetailed Documentation\n'
       '######################\n'
     + '\n' +
-    open('readme.rst').read()
+    open('README.rst').read()
     + '\n' +
     'Contributors\n'
     '############\n'
     + '\n' +
-    open('contributors.txt').read()
+    open('CONTRIBUTORS.txt').read()
     + '\n' +
     'Change history\n'
     '##############\n'
     + '\n' +
-    open('changes.txt').read()
+    open('CHANGES.txt').read()
     + '\n'
 )
 
