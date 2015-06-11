@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 name = 'inouk.edofx'
-version = '0.3.5'
+version = '0.3.6'
 
 
 long_description = (

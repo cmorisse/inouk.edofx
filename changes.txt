@@ -1,4 +1,13 @@
 =====
+0.3.6
+=====
+
+On 06/11/2015:
+
+- Improve PEP8 Compliance
+- Manage file encoding based on OFX Header content
+
+=====
 0.3.5
 =====
 
