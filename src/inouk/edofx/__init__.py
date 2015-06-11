@@ -29,96 +29,98 @@ __version__ = '0.3.5'
 
 _logger = logging.getLogger('OFXNode')
 
+
 class OFXNode(object):
     '''
     Used to represent OFX Trees
     '''
-    TYPE_UNDEFINED  = 0
-    TYPE_OPENING    = 1
-    TYPE_CLOSING    = 2
-    TYPE_SELFCLOSING= 3
-    TYPE_ERROR      = 9
+    TYPE_UNDEFINED = 0
+    TYPE_OPENING = 1
+    TYPE_CLOSING = 2
+    TYPE_SELFCLOSING = 3
+    TYPE_ERROR = 9
 
-    def __init__(self, type=TYPE_UNDEFINED, name='', value=''):
+    def __init__(self, type=TYPE_UNDEFINED, name='', value='', encoding=None):
         self.type = type
         self.name = name
         self.value = value
         self.children = []
         self.parent = None
-        self.__iter_src__=[]
-    
+        self.__iter_src__ = []
+        self.encoding = encoding
+
     def _get_nodes_chain(self):
         if self.parent is None:
             return self.name
         return self.parent._get_nodes_chain()+'.'+self.name
-    
+
     def __getattr__(self, name):
-        _logger.info('%s.__getattr__(%s)' % ( self._get_nodes_chain(), name ) )
+        _logger.debug("%s.__getattr__(%s)", self._get_nodes_chain(), name)
         for c in self.children:
-            if c.name == name :
+            if c.name == name:
                 c.parent = self
                 return c
-        raise AttributeError, "%s has no '%s' child node."  % (self._get_nodes_chain(), name)
+        raise AttributeError("%s has no '%s' child node." % (self._get_nodes_chain(), name,))
 
-    def __delattr__(self,name):
-        _logger.info('%s.__delattr__(%s)' % ( self._get_nodes_chain(), name ) )
+    def __delattr__(self, name):
+        _logger.debug("%s.__delattr__(%s)", self._get_nodes_chain(), name)
         delete_list = []
         for c in self.children:
-            if c.name == name :
+            if c.name == name:
                 delete_list.append(c)
         if delete_list:
             while delete_list:
                 self.children.__delitem__(self.children.index(delete_list[0]))
                 delete_list.__delitem__(0)
             return
-        raise AttributeError, "%s has no '%s' child node."  % (self._get_nodes_chain(), name)
-    
+        raise AttributeError("%s has no '%s' child node." % (self._get_nodes_chain(), name,))
+
     def _build_iter_source(self):
-        if self.parent == None:
+        if self.parent is None:
             return []
-        
+
         for elem in self.parent.children:
             if elem.name == self.name:
                 self.__iter_src__.append(elem)
         return self.__iter_src__
-    
+
     def __iter__(self):
-        _logger.info('%s.__iter__' % ( self._get_nodes_chain() ) )
+        _logger.debug("%s.__iter__", self._get_nodes_chain())
         if self.__iter_src__:
             return iter(self.__iter_src__)
         return iter(self._build_iter_source())
-    
+
     def __getitem__(self, index):
-        _logger.info('%s.__getitem__(%i)' % ( self._get_nodes_chain(), index ) )
-        if type(index)==int:
+        _logger.debug("%s.__getitem__(%i)", self._get_nodes_chain(), index)
+        if type(index) == int:
             if self.__iter_src__:
                 return self.__iter_src__[index]
             return self._build_iter_source()[index]
-        raise TypeError, "list indices must be integers"
+        raise TypeError("list indices must be integers")
 
     def __len__(self):
-        _logger.info('%s.__len__()' % ( self._get_nodes_chain(), ) )
+        _logger.debug("%s.__len__()", self._get_nodes_chain())
         if self.__iter_src__:
-            return len(self.__iter_src__)            
+            return len(self.__iter_src__)
         return len(self._build_iter_source())
 
-    def __repr__(self, show_parent=False, xml_style=False ):
+    def __repr__(self, show_parent=False, xml_style=False):
         if self.value:
             if show_parent:
                 return '<%s parent="%s">%s' % (self.name, self.parent.name, self.value,)
             if xml_style:
-                return '<%s>%s</%s>' % (self.name, self.value,self.name)
+                return '<%s>%s</%s>' % (self.name, self.value, self.name)
             return '<%s>%s' % (self.name, self.value,)
         return '<%s>...</%s>' % (self.name, self.name,)
 
     def _val(self):
         if self.name[:2] == 'DT':
-            return date( int(self.value[:4]), int(self.value[4:6]), int(self.value[6:8]) ) 
+            return date(int(self.value[:4]), int(self.value[4:6]), int(self.value[6:8]))
         elif self.name[-3:] == 'AMT':
-            return float(self.value.replace(',','.'))
-        return self.value
+            return float(self.value.replace(',', '.'))
+        return self.value.decode(self.encoding)
     val = property(_val)
-         
+
     def ofx_repr(self, repr=''):
         if self.value:
             # this is a self closing tag
@@ -126,7 +128,7 @@ class OFXNode(object):
 
         repr += "<%s>\n" % self.name
         for c in self.children:
-            repr += c.ofx_repr() 
+            repr += c.ofx_repr()
         repr += "</%s>\n" % self.name
         return repr
 
@@ -134,23 +136,24 @@ class OFXNode(object):
         result = ''
         for c in self.value:
             if c.isalpha():
-                result+=chr(random.randint(65,89))
+                result += chr(random.randint(65, 89))
             elif c.isdigit():
-                result+=random.choice('0123456789')
+                result += random.choice('0123456789')
             else:
-                result+=c
+                result += c
         return '<%s>%s' % (self.name, result,)
 
     def obfuscated_ofx_repr(self, repr=''):
         """
-        obfuscates output but OFXNode is left unmodified'
-        
-        Nodes 'ACCTTYPE', 'CODE', 'STATUS', 'SEVERITY', 'LANGUAGE', 
+        obfuscates output but OFXNode is left unmodified
+
+        Nodes 'ACCTTYPE', 'CODE', 'STATUS', 'SEVERITY', 'LANGUAGE',
         'CURDEF', 'TRNTYPE' are not obfuscated.
         """
         # TODO: implement a delegate
         if self.value:
-            if self.name[:2] == "DT" or self.name in ('ACCTTYPE', 'CODE', 'STATUS', 'SEVERITY', 'LANGUAGE', 'CURDEF', 'TRNTYPE', ):
+            if self.name[:2] == "DT" or self.name in ('ACCTTYPE', 'CODE', 'STATUS', 'SEVERITY',
+                                                      'LANGUAGE', 'CURDEF', 'TRNTYPE',):
                 return self.__repr__()+'\n'
             elif self.name[-3:] == 'AMT':
                 # TODO: we must return a random float value with the same sign and in a coherent range
@@ -163,7 +166,7 @@ class OFXNode(object):
 
         repr += "<%s>\n" % self.name
         for c in self.children:
-            repr += c.obfuscated_ofx_repr() 
+            repr += c.obfuscated_ofx_repr()
         repr += "</%s>\n" % self.name
         return repr
 
@@ -174,7 +177,7 @@ class OFXNode(object):
 
         repr += indent + "<%s>\n" % self.name
         for c in self.children:
-            repr += c.xml_repr(indent+'    ') 
+            repr += c.xml_repr(indent + '    ')
         repr += indent + "</%s>\n" % self.name
         return repr
 
@@ -184,11 +187,11 @@ class OFXNode(object):
         """
         if self.name == search_name:
             return [self]
-        found_list = []  
+        found_list = []
         for n in self.children:
             found_list.extend(n.find_children_by_name(search_name))
         return found_list
-    
+
     def get_type_name(self):
         """
         Used for parser tuning
@@ -204,11 +207,12 @@ class OFXNode(object):
         elif self.type == self.TYPE_ERROR:
             return 'TYPE_ERROR'
 
+
 class OFXParser(object):
     """
     Parses an OFX source string and returns corresponding OFXNode tree
     """
-    def __init__(self, source):
+    def __init__(self, source, encoding=None):
         """
         setup parser and define parsing parameters.
         """
@@ -217,16 +221,17 @@ class OFXParser(object):
             self.ready = False
             self.src = ""
 
-        self.ready               = True
-        self.source              = source
-        self.source_idx          = 0
-        self.source_len          = len(source)
-        self.__EOF               = False
-        self.current_char        = None
+        self.ready = True
+        self.source = source
+        self.source_idx = 0
+        self.source_len = len(source)
+        self.__EOF = False
+        self.current_char = None
         self.current_line_number = 1
-        self.OFX_tree            = None
-        self.OFX_headers         = None
-        
+        self.OFX_tree = None
+        self.OFX_headers = None
+        self.source_encoding=encoding
+
     def _read_char(self):
         """
         Consume one char from source.
@@ -235,7 +240,7 @@ class OFXParser(object):
         """
         if self.__EOF:
             return ''
-        
+
         self.current_char = self.source[self.source_idx]
 
         if self.source_idx + 1 < self.source_len:
@@ -244,13 +249,13 @@ class OFXParser(object):
             self.next_char = ''
 
         self.source_idx += 1
-        
+
         if self.current_char == '\n':
             self.current_line_number += 1
-        
-        if self.source_idx==self.source_len:
-            self.__EOF=True
-            
+
+        if self.source_idx == self.source_len:
+            self.__EOF = True
+
         return self.current_char
 
     def _reject_char(self):
@@ -260,7 +265,7 @@ class OFXParser(object):
         self.source_idx -= 1
         self.__EOF = False
         self.next_char = self.current_char
-        self.current_char = self.source[self.source_idx]            
+        self.current_char = self.source[self.source_idx]
         return self.current_char
 
     def _read_tag_name(self, first_char=''):
@@ -269,34 +274,34 @@ class OFXParser(object):
         """
         c = self._read_char()
         tmp_name = first_char
-        while c <> '' and c <> '>':
+        while c != '' and c != '>':
             tmp_name += c
             c = self._read_char()
-        
+
         if c == '':
             # we should not have encountered eof in a tag name
             return ''
-        
+
         if not tmp_name.isalpha() and not tmp_name.isupper():
             return ''
-        
-        return tmp_name    
-        
-    def _read_tag_value(self,first_char=''):
+
+        return tmp_name
+
+    def _read_tag_value(self, first_char=''):
         """
-        Read an OFX tag value 
+        Read an OFX tag value
             Tag value starts after the tag until beginning of next tag
-            Tag value can't spawn several lines        
+            Tag value can't spawn several lines
         """
         c = self._read_char()
         tmp_name = first_char
-        while( c <> '<' ):
+        while c != '<':
             tmp_name += c
             c = self._read_char()
-        
+
         if c == '<':
-            return tmp_name # may be we should not accept a selfclosing tag alone
-        
+            return tmp_name  # may be we should not accept a selfclosing tag alone
+
         if c == '\r':
             # if we have \n after it's ok ; this is a PC generated file
             # else this is a file error
@@ -309,9 +314,9 @@ class OFXParser(object):
 
         if c == '\n':
             # only \n after a tag is ok ; this is a Unix generated file
-            return tmp_name    
+            return tmp_name
 
-        return None # should never pass here
+        return None  # should never pass here
 
     def _read_tag(self):
         """
@@ -320,7 +325,7 @@ class OFXParser(object):
             None when EOF is reached
             Tag with type = TYPE_ERROR if line is malformed
         """
-        current_tag = OFXNode()
+        current_tag = OFXNode(encoding=self.source_encoding)
 
         c = self._read_char()
 
@@ -340,24 +345,24 @@ class OFXParser(object):
             if current_tag.name == '':
                 current_tag.type = OFXNode.TYPE_ERROR
                 return current_tag
-            
+
             tmp_value = ''
             value = False
             c = self._read_char()
-            while c <> '<' and c <> '':
+            while c != '<' and c != '':
                 tmp_value += c
-                if c <> '\r' and c <> '\n':
+                if c != '\r' and c != '\n':
                     value = True
                 c = self._read_char()
 
             # we reject the '<' we've just read
             self._reject_char()
-            
+
             # type ==  TYPE_CLOSING and value = False     => TYPE_CLOSING
             # type ==  TYPE_CLOSING and value             => TYPE_ERROR
-            # type <>  TYPE_CLOSING and value == False    => TYPE_OPENING      mais incohérent avec le EOF 
+            # type <>  TYPE_CLOSING and value == False    => TYPE_OPENING      mais incohérent avec le EOF
             # type <>  TYPE_CLOSING and value == True     => TYPE_SELFCLOSING  mais incohérent avec le EOF
-            
+
             if current_tag.type == OFXNode.TYPE_CLOSING:
                 if value:
                     current_tag.type = OFXNode.TYPE_ERROR
@@ -365,17 +370,16 @@ class OFXParser(object):
 
             if value:
                 current_tag.type = OFXNode.TYPE_SELFCLOSING
-                if tmp_value[-1]=='\n' and tmp_value[-2]=='\r': # Windows style end of line
-                    current_tag.value = tmp_value[:-2]  
+                if tmp_value[-1] == '\n' and tmp_value[-2] == '\r':  # Windows style end of line
+                    current_tag.value = tmp_value[:-2]
                 elif tmp_value[-1] == '\n':                    # Unix style end of line
                     current_tag.value = tmp_value[:-1]
                 else:
                     current_tag.value = tmp_value
             else:
                 current_tag.type = OFXNode.TYPE_OPENING
-                    
-            return current_tag
 
+            return current_tag
 
     def _read_header_line(self):
         """
@@ -396,8 +400,11 @@ class OFXParser(object):
             line += c
             c = self._read_char()
 
-        return line.split(':')
+        # Quick and dirty hack to remove Windows EOL in headers
+        if line[-1] == '\r':
+            line = line[:-1]
 
+        return line.split(':')
 
     def _parse_headers(self):
         """
@@ -406,10 +413,11 @@ class OFXParser(object):
         headers_dict = {}
         h = self._read_header_line()
         while h is not None:
-            headers_dict[h[0]]=h[1]
+            headers_dict[h[0]] = h[1]
             h = self._read_header_line()
+            if h and h[0]=='CHARSET':
+                self.source_encoding = h[1]
         return headers_dict
-
 
     def _parse_content(self):
         tag = self._read_tag()
@@ -430,7 +438,6 @@ class OFXParser(object):
         _logger.debug(tag)
         return tag
 
-
     def parse_headers(self):
         """
         Parse headers only and set parser ready to parse content.
@@ -447,11 +454,10 @@ class OFXParser(object):
 
         return self.OFX_headers
 
-
     def parse(self):
         """
         Parse OFX source and returns an OFXNode tree
-        
+
         returns None if source is undefined.
         """
         if not self.ready:
@@ -468,15 +474,13 @@ class OFXParser(object):
         return self.OFX_tree
 
 
-
 class OFXObfuscator(object):
     """
     Obfuscates OFX source strings
-    
+
     Problem with OFXObfuscator is that it's so basic, it breaks date.
     So when parsing an obfuscated file you can't use .val on date attribute
-    an must rely on .value. 
-    
+    an must rely on .value.
     """
     def __init__(self, source):
         """
@@ -488,11 +492,11 @@ class OFXObfuscator(object):
             self.ready = False
             self.source = ""
 
-        self.ready      = True
-        self.source     = source
+        self.ready = True
+        self.source = source
         self.source_idx = 0
         self.source_len = len(source)
-        self.result     = ''
+        self.result = ''
 
     def __read_tag_name(self):
         """
@@ -500,25 +504,25 @@ class OFXObfuscator(object):
         """
         # on entry idx is on '<'
         # on exit idx is on '>'
-        while self.source_idx < self.source_len and self.source[self.source_idx] <> '>':
+        while self.source_idx < self.source_len and self.source[self.source_idx] != '>':
             self.result += self.source[self.source_idx]
             self.source_idx += 1
-        
+
         if self.source_idx < self.source_len:
             self.result += self.source[self.source_idx]
-                    
+
     def obfuscate(self):
         if not self.ready:
             raise Exception("NotReady")  # TODO: Setup a specific catchable Exception
-        
-        while( self.source_idx < self.source_len ):
+
+        while self.source_idx < self.source_len:
             current_char = self.source[self.source_idx]
-            
+
             if current_char == '<':
                 self.result += '<'
                 self.source_idx += 1
                 self.__read_tag_name()
-                
+
             elif current_char.isdigit():
                 self.result += '9'
 
@@ -529,5 +533,5 @@ class OFXObfuscator(object):
                 self.result += current_char
 
             self.source_idx += 1
-                 
+
         return self.result
