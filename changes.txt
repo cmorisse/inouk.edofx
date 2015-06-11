@@ -1,11 +1,12 @@
 =====
-0.3.6
+0.3.7
 =====
 
 On 06/11/2015:
 
 - Improve PEP8 Compliance
 - Manage file encoding based on OFX Header content
+- Fix problem with file names in uppercase (eg. README.rst)
 
 =====
 0.3.5
