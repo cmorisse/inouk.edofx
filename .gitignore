@@ -16,7 +16,7 @@ tests/output/*csv
 .idea/
 py2*/
 venv*/
-
+.vscode/
 #
 # from github...
 #

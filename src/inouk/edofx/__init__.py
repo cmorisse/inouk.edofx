@@ -24,7 +24,7 @@ import random
 from datetime import date
 
 
-__version__ = '0.3.5'
+__version__ = '0.3.6'
 
 
 _logger = logging.getLogger('OFXNode')
@@ -250,6 +250,9 @@ class OFXParser(object):
 
         self.source_idx += 1
 
+        if self.current_char == '\r' and self.next_char == '\n':
+            self._read_char()
+
         if self.current_char == '\n':
             self.current_line_number += 1
 
@@ -288,8 +291,7 @@ class OFXParser(object):
         return tmp_name
 
     def _read_tag_value(self, first_char=''):
-        """
-        Read an OFX tag value
+        """ Reads an OFX tag value
             Tag value starts after the tag until beginning of next tag
             Tag value can't spawn several lines
         """
@@ -319,8 +321,7 @@ class OFXParser(object):
         return None  # should never pass here
 
     def _read_tag(self):
-        """
-        Parse current file and return one tag.
+        """ Parses current file and return one tag.
         Returns:
             None when EOF is reached
             Tag with type = TYPE_ERROR if line is malformed
@@ -328,7 +329,11 @@ class OFXParser(object):
         current_tag = OFXNode(encoding=self.source_encoding)
 
         c = self._read_char()
-
+        while c and c != '<':
+            c = self._read_char()
+        if not c:
+            return None
+        
         if c == '<':
             c = self._read_char()
             if c == '':
@@ -349,9 +354,9 @@ class OFXParser(object):
             tmp_value = ''
             value = False
             c = self._read_char()
-            while c != '<' and c != '':
+            while c not in ('<', '\r', '\n', ''):
                 tmp_value += c
-                if c != '\r' and c != '\n':
+                if c not in ('\r', '\n', '\t',):
                     value = True
                 c = self._read_char()
 
@@ -401,21 +406,19 @@ class OFXParser(object):
             c = self._read_char()
 
         # Quick and dirty hack to remove Windows EOL in headers
-        if line[-1] == '\r':
+        if line and line[-1] == '\r':
             line = line[:-1]
-
-        return line.split(':')
+        header = line and line.split(':') or None
+        return header
 
     def _parse_headers(self):
-        """
-        Parse headers and returns them as a dict
-        """
+        """ Parse headers and returns them as a dict """
         headers_dict = {}
         h = self._read_header_line()
-        while h is not None:
+        while h:
             headers_dict[h[0]] = h[1]
             h = self._read_header_line()
-            if h and h[0]=='CHARSET':
+            if h and h[0] == 'CHARSET':
                 self.source_encoding = h[1]
         return headers_dict
 
