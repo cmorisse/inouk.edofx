@@ -24,7 +24,7 @@ import random
 from datetime import date
 
 
-__version__ = '0.3.6'
+__version__ = '0.3.9'
 
 
 _logger = logging.getLogger('OFXNode')
@@ -118,7 +118,7 @@ class OFXNode(object):
             return date(int(self.value[:4]), int(self.value[4:6]), int(self.value[6:8]))
         elif self.name[-3:] == 'AMT':
             return float(self.value.replace(',', '.'))
-        return self.value.decode(self.encoding)
+        return self.value.decode(self.encoding) if self.encoding else self.value
     val = property(_val)
 
     def ofx_repr(self, repr=''):
